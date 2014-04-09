@@ -11,48 +11,36 @@ void failwith(const char * msg){
 	fprintf(stderr, "%s\n", msg);
 	exit(EXIT_FAILURE);
 }
-
+#define BUFFER_SIZE 512
 int main(int argc, const char *argv[])
 {
-	char buffer[100];
+	if (argc != 4) {
+		failwith("wrong arguments");
+	}
+	char buffer[BUFFER_SIZE];
 	//Obtain UDP port TCP port server addres
-	//TODO
 
-	short udp_port;
-	short tcp_port;
-	char tcp_port_char[10];
-	
-
-	char host[80];
-
-	printf("UDP Port: ");
-	scanf("%d", &udp_port);
-
-	printf("TCP Port: ");
-	scanf("%s", &tcp_port_char);
-	tcp_port = atoi(tcp_port_char);
-	
-
-	printf("Server: ");
-	scanf("%s", &host);
+	short udp_port = atoi(argv[1]);
+	short tcp_port = atoi(argv[2]);
+	const char *tcp_port_char = argv[2];
+	const char *host = argv[3];
 
 	//Open UDP Socket
 
-	int udp_socket;
+	int udp_socket; //socket FD
 
 	struct sockaddr_in udp_sockaddr;
 
 	socklen_t udp_sockaddr_len;
 
-
 	udp_sockaddr.sin_family = AF_INET;
 	udp_sockaddr.sin_addr.s_addr = htonl(INADDR_ANY);
 	udp_sockaddr.sin_port = htons(udp_port);
-	
+
 	udp_sockaddr_len = (socklen_t) sizeof(udp_sockaddr);
 
 	udp_socket = socket(AF_INET, SOCK_DGRAM, 0);
-	
+
 	if (udp_socket < 0)
 		failwith("socket");
 
@@ -91,94 +79,39 @@ int main(int argc, const char *argv[])
 	if (connect(tcp_socket, addr_tcp->ai_addr, addr_tcp->ai_addrlen) < 0)
 		failwith("connect");
 
-	freeaddrinfo(addr_tcp);
-	
-	printf("Sending %d %d\n", udp_port, htons(udp_port));
-	sprintf(buffer, "%d", htons(udp_port));
-	if (write(tcp_socket, buffer, strlen(buffer)) < 0)
+	//Connected to TCP server
+
+	short conv_udp_port = htons(udp_port);
+	if (write(tcp_socket, &conv_udp_port, sizeof(conv_udp_port)) < 0)
 		failwith("write");
 
-	//Connected
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	/*
-	const char * host	= argv[3];
+	//UDP Port number send
 
-	int udp_socket;
-
-	struct addrinfo addr_hints;
-	struct addrinfo * addr;
-	
-	struct sockaddr_in client_udp_address;
-	struct sockaddr_in server_address;
-
-	socklen_t client_udp_address_len;
-
-	(void) memset(&addr_hints, 0, sizeof(struct addrinfo));
-
-	addr_hints.ai_family	= AF_INET;
-	addr_hints.ai_socktype	= SOCK_DGRAM;
-	addr_hints.ai_protocol	= IPPROTO_UDP;
-	addr_hints.ai_flags	= 0;
-	addr_hints.ai_addrlen	= 0;
-	addr_hints.ai_addr	= NULL;
-	addr_hints.ai_canonname	= NULL;
-	addr_hints.ai_next	= NULL;
-	
-	if (getaddrinfo(host, NULL, &addr_hints, &addr) != 0) {
-		failwith("getaddrinfo");
+	//Sending data
+	while (fgets(buffer, BUFFER_SIZE, stdin)) {
+		if (write(tcp_socket, buffer, strlen(buffer)) < 0) {
+			failwith("write");
+		}
 	}
 
-	client_udp_address.sin_family = AF_INET;
-	client_udp_address.sin_addr.s_addr =
-		((struct sockaddr_in*) (addr->ai_addr))->sin_addr.s_addr;
-	client_udp_address.sin_port = htons(udp_port);
-	
-	client_udp_address_len = (socklen_t) sizeof(client_udp_address);
-
-	//Open UDP socket
-	//TODO
-
-	udp_socket = socket(AF_INET, SOCK_DGRAM, 0);
-	
-	if (bind(udp_socket, client_udp_address, client_udp_address_len) != 0) {
-		failwith("BIND");
-	}
-	//Connect to server
-	//TODO
-
-	//Senddata from stdin
-	//TODO
+	close(tcp_socket);
 
 	//Receive UDP from serwer
-	//TODO
+	struct sockaddr_in udp_client;
+	int rcvlen;
+	int udp_client_len = (ssize_t)sizeof(udp_client);
+	do {
+		rcvlen = recvfrom(udp_socket, buffer, sizeof(buffer),
+			0, (struct sockaddr *)&udp_client, &udp_client_len);
+		if (rcvlen < 0) {
+			failwith("recvfrom udp");
+		}
+		int data = ntohl(atoi(buffer));
+		printf("Number of octets: %u\n", data);
 
-	//Write on stdout received number
-	//TODO
-	freeaddrinfo(addr);*/
+	} while(udp_client.sin_addr.s_addr != ((struct sockaddr_in *)addr_tcp->ai_addr)->sin_addr.s_addr);
+
+	close(udp_socket);
+	freeaddrinfo(addr_tcp);
 	return 0;
 }

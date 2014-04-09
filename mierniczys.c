@@ -4,8 +4,9 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <netdb.h>
+#include <string.h>
 
-#define BUFFER_SIZE	1000
+#define BUFFER_SIZE	1024
 #define QUEUE_LENGTH	5
 void failwith(const char * msg){
 	fprintf(stderr, "FAILED WITH: ");
@@ -15,19 +16,17 @@ void failwith(const char * msg){
 
 int main(int argc, const char *argv[])
 {
+	if (argc != 2) {
+		failwith("no port number");
+	}
 
-
-	short tcp_port;
-	printf("Type in port number: \n");
-	scanf("%d", &tcp_port);
+	short tcp_port = atoi(argv[1]);
 
 	int tcp_socket;
 
-	struct sockaddr_in client_udp_address;
 	struct sockaddr_in tcp_addr;
 
 	socklen_t tcp_addr_len;
-
 
 	tcp_addr.sin_family = AF_INET;
 	tcp_addr.sin_addr.s_addr = htonl(INADDR_ANY);
@@ -36,7 +35,7 @@ int main(int argc, const char *argv[])
 	tcp_addr_len = (socklen_t) sizeof(tcp_addr);
 
 	tcp_socket = socket(PF_INET, SOCK_STREAM, 0);
-	
+
 	if (tcp_socket < 0)
 		failwith("socket");
 
@@ -55,7 +54,6 @@ int main(int argc, const char *argv[])
 		failwith("listen");
 
 	//Get port number UDP
-	//TODO
 
 	int client_sock;
 	struct sockaddr_in client_address;
@@ -68,30 +66,52 @@ int main(int argc, const char *argv[])
 
 	if (client_sock < 0)
 		failwith("accept");
+
 	short udp_port;
 
 	int len;
 	char buffer[BUFFER_SIZE];
 
-	len = read(client_sock, buffer, BUFFER_SIZE);
+	len = read(client_sock, &udp_port, sizeof(udp_port));
 	if (len < 0)
 		failwith("read");
-	printf("read udp port: %s\n", buffer);
-	udp_port = ntohs(atoi(buffer));
+
+	udp_port = ntohs(udp_port);
 	
-	printf("read udp port: %d\n", udp_port);
-	//Get data
-	//TODO
+	memset(buffer, 0, BUFFER_SIZE);
 
-	//Calculate data size
-	//TODO
+	long datasize = 0;
 
-	//Connect to client on UDP
-	//TODO
+	while(len > 0) {
+		len = read(client_sock, buffer, BUFFER_SIZE);
+		if (len < 0)
+			failwith("read");
+		datasize += len;
+	}
+	
+	printf("Read: %d\n", datasize);
 
-	//Send data size
-	//TODO
+	close(client_sock);
+	close(tcp_socket);
 
-	//Close all and finish
+	struct sockaddr_in udp_addr;
+
+	udp_addr.sin_family	= AF_INET;
+	udp_addr.sin_port	= htons(udp_port);
+	udp_addr.sin_addr.s_addr= client_address.sin_addr.s_addr;
+
+	int udp_socket = socket(AF_INET, SOCK_DGRAM, 0);
+	if (udp_socket < 0) {
+		failwith("Socket");
+	}
+	
+	sprintf(buffer, "%d", htonl(datasize));
+	int buflen = strlen(buffer);
+	int sndlen = sendto(udp_socket, buffer, buflen,
+		0, (struct sockaddr *)&udp_addr, sizeof(udp_addr));
+	
+	if (sndlen != buflen){
+		failwith("Write");
+	}
 	return 0;
 }
